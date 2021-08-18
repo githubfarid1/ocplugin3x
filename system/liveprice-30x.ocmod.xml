@@ -1,0 +1,381 @@
+<modification>
+     <id>esmsgatewaycom@gmail.com-PRICELIVE</id>
+    <name>Live Price Update PRO®</name>
+    <version>1.0</version>
+    <author>esmsgatewaycom@gmail.com</author>
+    <code>esmsgatewaycom@gmail.com-PRICELIVE</code>
+    <file path="system/library/cart/cart.php">
+      <operation error="skip">
+          <search ><![CDATA[public function getProducts() {]]></search>
+          <add position="before"><![CDATA[
+            //PL
+          	public function autoprice($product_id, $options, $recurring_id, $quantity = 1) {
+          		$product_data = array();
+          		$stock = true;
+          		$product_query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product_to_store p2s LEFT JOIN " . DB_PREFIX . "product p ON (p2s.product_id = p.product_id) LEFT JOIN " . DB_PREFIX . "product_description pd ON (p.product_id = pd.product_id) WHERE p2s.store_id = '" . (int)$this->config->get('config_store_id') . "' AND p2s.product_id = '" . (int)$product_id . "' AND pd.language_id = '" . (int)$this->config->get('config_language_id') . "' AND p.date_available <= NOW() AND p.status = '1'");
+          		if ($product_query->num_rows && ($quantity > 0)) {
+          			$option_price = 0;
+          			$option_points = 0;
+          			$option_weight = 0;
+          			$option_data = array();
+          			foreach ($options as $product_option_id => $value) {
+          				$option_query = $this->db->query("SELECT po.product_option_id, po.option_id, od.name, o.type FROM " . DB_PREFIX . "product_option po LEFT JOIN `" . DB_PREFIX . "option` o ON (po.option_id = o.option_id) LEFT JOIN " . DB_PREFIX . "option_description od ON (o.option_id = od.option_id) WHERE po.product_option_id = '" . (int)$product_option_id . "' AND po.product_id = '" . (int)$product_id . "' AND od.language_id = '" . (int)$this->config->get('config_language_id') . "'");
+
+          				if ($option_query->num_rows) {
+          					//$option_value_query->row['price']
+          					if ($option_query->row['type'] == 'select' || $option_query->row['type'] == 'radio') {
+          						$option_value_query = $this->db->query("SELECT pov.option_value_id, ovd.name, pov.quantity, pov.subtract, pov.price, pov.price_prefix, pov.points, pov.points_prefix, pov.weight, pov.weight_prefix FROM " . DB_PREFIX . "product_option_value pov LEFT JOIN " . DB_PREFIX . "option_value ov ON (pov.option_value_id = ov.option_value_id) LEFT JOIN " . DB_PREFIX . "option_value_description ovd ON (ov.option_value_id = ovd.option_value_id) WHERE pov.product_option_value_id = '" . (int)$value . "' AND pov.product_option_id = '" . (int)$product_option_id . "' AND ovd.language_id = '" . (int)$this->config->get('config_language_id') . "'");
+          						//print_r($option_value_query->row['price']);
+          						if ($option_value_query->num_rows) {
+          							if ($option_value_query->row['price_prefix'] == '+') {
+          								$option_price += $option_value_query->row['price'];
+          							} elseif ($option_value_query->row['price_prefix'] == '-') {
+          								$option_price -= $option_value_query->row['price'];
+          							}
+
+          							if ($option_value_query->row['points_prefix'] == '+') {
+          								$option_points += $option_value_query->row['points'];
+          							} elseif ($option_value_query->row['points_prefix'] == '-') {
+          								$option_points -= $option_value_query->row['points'];
+          							}
+
+          							if ($option_value_query->row['weight_prefix'] == '+') {
+          								$option_weight += $option_value_query->row['weight'];
+          							} elseif ($option_value_query->row['weight_prefix'] == '-') {
+          								$option_weight -= $option_value_query->row['weight'];
+          							}
+
+          							if ($option_value_query->row['subtract'] && (!$option_value_query->row['quantity'] || ($option_value_query->row['quantity'] < $quantity))) {
+          								$stock = false;
+          							}
+
+          							$option_data[] = array(
+          								'product_option_id'       => $product_option_id,
+          								'product_option_value_id' => $value,
+          								'option_id'               => $option_query->row['option_id'],
+          								'option_value_id'         => $option_value_query->row['option_value_id'],
+          								'name'                    => $option_query->row['name'],
+          								'value'                   => $option_value_query->row['name'],
+          								'type'                    => $option_query->row['type'],
+          								'quantity'                => $option_value_query->row['quantity'],
+          								'subtract'                => $option_value_query->row['subtract'],
+          								'price'                   => $option_value_query->row['price'],
+          								'price_prefix'            => $option_value_query->row['price_prefix'],
+          								'points'                  => $option_value_query->row['points'],
+          								'points_prefix'           => $option_value_query->row['points_prefix'],
+          								'weight'                  => $option_value_query->row['weight'],
+          								'weight_prefix'           => $option_value_query->row['weight_prefix']
+          							);
+          						}
+          					} elseif ($option_query->row['type'] == 'checkbox' && is_array($value)) {
+          						foreach ($value as $product_option_value_id) {
+          							$option_value_query = $this->db->query("SELECT pov.option_value_id, pov.quantity, pov.subtract, pov.price, pov.price_prefix, pov.points, pov.points_prefix, pov.weight, pov.weight_prefix, ovd.name FROM " . DB_PREFIX . "product_option_value pov LEFT JOIN " . DB_PREFIX . "option_value_description ovd ON (pov.option_value_id = ovd.option_value_id) WHERE pov.product_option_value_id = '" . (int)$product_option_value_id . "' AND pov.product_option_id = '" . (int)$product_option_id . "' AND ovd.language_id = '" . (int)$this->config->get('config_language_id') . "'");
+
+          							if ($option_value_query->num_rows) {
+          								if ($option_value_query->row['price_prefix'] == '+') {
+          									$option_price += $option_value_query->row['price'];
+          								} elseif ($option_value_query->row['price_prefix'] == '-') {
+          									$option_price -= $option_value_query->row['price'];
+          								}
+
+          								if ($option_value_query->row['points_prefix'] == '+') {
+          									$option_points += $option_value_query->row['points'];
+          								} elseif ($option_value_query->row['points_prefix'] == '-') {
+          									$option_points -= $option_value_query->row['points'];
+          								}
+
+          								if ($option_value_query->row['weight_prefix'] == '+') {
+          									$option_weight += $option_value_query->row['weight'];
+          								} elseif ($option_value_query->row['weight_prefix'] == '-') {
+          									$option_weight -= $option_value_query->row['weight'];
+          								}
+
+          								if ($option_value_query->row['subtract'] && (!$option_value_query->row['quantity'] || ($option_value_query->row['quantity'] < $quantity))) {
+          									$stock = false;
+          								}
+
+          								$option_data[] = array(
+          									'product_option_id'       => $product_option_id,
+          									'product_option_value_id' => $product_option_value_id,
+          									'option_id'               => $option_query->row['option_id'],
+          									'option_value_id'         => $option_value_query->row['option_value_id'],
+          									'name'                    => $option_query->row['name'],
+          									'value'                   => $option_value_query->row['name'],
+          									'type'                    => $option_query->row['type'],
+          									'quantity'                => $option_value_query->row['quantity'],
+          									'subtract'                => $option_value_query->row['subtract'],
+          									'price'                   => $option_value_query->row['price'],
+          									'price_prefix'            => $option_value_query->row['price_prefix'],
+          									'points'                  => $option_value_query->row['points'],
+          									'points_prefix'           => $option_value_query->row['points_prefix'],
+          									'weight'                  => $option_value_query->row['weight'],
+          									'weight_prefix'           => $option_value_query->row['weight_prefix']
+          								);
+          							}
+          						}
+          					}
+          				}
+          			}
+
+          			$price = $product_query->row['price'];
+          			$discount_quantity = 0;
+          			$discount_quantity = $quantity;
+          			$product_discount_query = $this->db->query("SELECT price FROM " . DB_PREFIX . "product_discount WHERE product_id = '" . (int)$product_id  . "' AND customer_group_id = '" . (int)$this->config->get('config_customer_group_id') . "' AND quantity <= '" . (int)$discount_quantity . "' AND ((date_start = '0000-00-00' OR date_start < NOW()) AND (date_end = '0000-00-00' OR date_end > NOW())) ORDER BY quantity DESC, priority ASC, price ASC LIMIT 1");
+
+          			if ($product_discount_query->num_rows) {
+          				$price = $product_discount_query->row['price'];
+          			}
+
+          			// Product Specials
+          			$product_special_query = $this->db->query("SELECT price FROM " . DB_PREFIX . "product_special WHERE product_id = '" . (int)$product_id . "' AND customer_group_id = '" . (int)$this->config->get('config_customer_group_id') . "' AND ((date_start = '0000-00-00' OR date_start < NOW()) AND (date_end = '0000-00-00' OR date_end > NOW())) ORDER BY priority ASC, price ASC LIMIT 1");
+          			$oldPrice = 0;
+          			if ($product_special_query->num_rows) {
+          				$oldPrice = $price;
+          				$price = $product_special_query->row['price'];
+          			}
+
+          			// Reward Points
+          			$product_reward_query = $this->db->query("SELECT points FROM " . DB_PREFIX . "product_reward WHERE product_id = '" . (int)$product_id . "' AND customer_group_id = '" . (int)$this->config->get('config_customer_group_id') . "'");
+
+          			if ($product_reward_query->num_rows) {
+          				$reward = $product_reward_query->row['points'];
+          			} else {
+          				$reward = 0;
+          			}
+          			// Stock
+          			if (!$product_query->row['quantity'] || ($product_query->row['quantity'] < $quantity)) {
+          				$stock = false;
+          			}
+
+          			$recurring_query = $this->db->query("SELECT * FROM " . DB_PREFIX . "recurring r LEFT JOIN " . DB_PREFIX . "product_recurring pr ON (r.recurring_id = pr.recurring_id) LEFT JOIN " . DB_PREFIX . "recurring_description rd ON (r.recurring_id = rd.recurring_id) WHERE r.recurring_id = '" . (int)$recurring_id . "' AND pr.product_id = '" . (int)$product_id . "' AND rd.language_id = " . (int)$this->config->get('config_language_id') . " AND r.status = 1 AND pr.customer_group_id = '" . (int)$this->config->get('config_customer_group_id') . "'");
+
+          			if ($recurring_query->num_rows) {
+          				$recurring = array(
+          					'recurring_id'    => $cart['recurring_id'],
+          					'name'            => $recurring_query->row['name'],
+          					'frequency'       => $recurring_query->row['frequency'],
+          					'price'           => $recurring_query->row['price'],
+          					'cycle'           => $recurring_query->row['cycle'],
+          					'duration'        => $recurring_query->row['duration'],
+          					'trial'           => $recurring_query->row['trial_status'],
+          					'trial_frequency' => $recurring_query->row['trial_frequency'],
+          					'trial_price'     => $recurring_query->row['trial_price'],
+          					'trial_cycle'     => $recurring_query->row['trial_cycle'],
+          					'trial_duration'  => $recurring_query->row['trial_duration']
+          				);
+          			} else {
+          				$recurring = false;
+          			}
+          			$product_data = array(
+          				'product_id'      => $product_query->row['product_id'],
+          				'name'            => $product_query->row['name'],
+          				'model'           => $product_query->row['model'],
+          				'shipping'        => $product_query->row['shipping'],
+          				'image'           => $product_query->row['image'],
+          				'quantity'        => $quantity,
+          				'minimum'         => $product_query->row['minimum'],
+          				'subtract'        => $product_query->row['subtract'],
+          				'stock'           => $stock,
+          				'price'           => ($price + $option_price),
+          				'old_price'           => ($oldPrice + $option_price),
+          				'total'           => ($price + $option_price) * $quantity,
+          				'reward'          => $reward * $quantity,
+          				'points'          => ($product_query->row['points'] ? ($product_query->row['points'] + $option_points) * $quantity : 0),
+          				'tax_class_id'    => $product_query->row['tax_class_id'],
+          				'weight'          => ($product_query->row['weight'] + $option_weight) * $quantity,
+          				'weight_class_id' => $product_query->row['weight_class_id'],
+          				'length'          => $product_query->row['length'],
+          				'width'           => $product_query->row['width'],
+          				'height'          => $product_query->row['height'],
+          				'length_class_id' => $product_query->row['length_class_id'],
+          				'recurring'       => $recurring
+          			);
+
+          		}
+
+          		return $product_data;
+          	}
+            //--
+            ]]>
+          </add>
+      </operation>
+
+    </file>
+    <file path="catalog/controller/checkout/cart.php">
+      <operation error="skip">
+          <search ><![CDATA[public function index() {]]></search>
+          <add position="before"><![CDATA[
+            //PL
+            public function autoprice() {
+              $this->load->language('checkout/cart');
+              $json = array();
+              if (isset($this->request->post['product_id'])) {
+                $product_id = (int)$this->request->post['product_id'];
+              } else {
+                $product_id = 0;
+              }
+              $this->load->model('catalog/product');
+
+              $product_info = $this->model_catalog_product->getProduct($product_id);
+
+              if ($product_info) {
+                if (isset($this->request->post['quantity']) && ((int)$this->request->post['quantity'] >= $product_info['minimum'])) {
+                  $quantity = (int)$this->request->post['quantity'];
+                } else {
+                  $quantity = $product_info['minimum'] ? $product_info['minimum'] : 1;
+                }
+
+                if (isset($this->request->post['option'])) {
+                  $option = array_filter($this->request->post['option']);
+                } else {
+                  $option = array();
+                }
+                if (isset($this->request->post['recurring_id'])) {
+                  $recurring_id = $this->request->post['recurring_id'];
+                } else {
+                  $recurring_id = 0;
+                }
+                if (!$json) {
+                  $product_data = $this->cart->autoprice($this->request->post['product_id'], $option, $recurring_id, $quantity);
+            		}
+            		//print_r($product_data);
+            		if ($this->customer->isLogged() || !$this->config->get('config_customer_price')) {
+            			$count = 0;
+            			$total = 0;
+            			$oldTotal = 0;
+            			$extax = 0;
+            			while ($count < $quantity) {
+            				$price = $this->tax->calculate($product_data['price'], $product_data['tax_class_id'], $this->config->get('config_tax'));
+            				$total += $price;
+            				$extax += $product_data['price'];
+            				$oldPrice = $this->tax->calculate($product_data['old_price'], $product_data['tax_class_id'], $this->config->get('config_tax'));
+            				$oldTotal += $oldPrice;
+
+            				$count++;
+            			}
+            			$json['price'] = $this->currency->format($total, $this->session->data['currency']);
+            			$json['old_price'] = $this->currency->format($oldTotal, $this->session->data['currency']);
+            			$json['points'] = $product_data['points'];
+            			$json['extax'] = $this->currency->format($extax, $this->session->data['currency']);
+
+            		} else {
+            			$json['price'] = false;
+            			$json['points'] = false;
+            			$json['old_price'] = false;
+            		}
+            		//print_r($this->config->get('config_tax'));
+              }
+
+              //print_r($product_data);
+              $this->response->addHeader('Content-Type: application/json');
+              $this->response->setOutput(json_encode($json));
+            }
+            //--
+            ]]>
+          </add>
+      </operation>
+
+    </file>
+    <file path="catalog/view/theme/*/template/product/product.twig">
+      <operation error="skip">
+          <search ><![CDATA[{{ footer }}]]></search>
+          <add position="before"><![CDATA[
+            <!--PL-->
+            <script type="text/javascript"><!--
+            $(document).ready(function() {
+              var price = $("#content").find(".auto-price");
+              function autoprice() {
+                $.ajax({
+              		url: 'index.php?route=checkout/cart/autoprice',
+                  timeout: 10000,
+              		type: 'post',
+              		data: $('#product input[type=\'text\'], #product input[type=\'hidden\'], #product input[type=\'radio\']:checked, #product input[type=\'checkbox\']:checked, #product select, #product textarea'),
+              		dataType: 'json',
+              		beforeSend: function() {
+                    price.fadeOut();
+              		},
+              		complete: function() {
+                  },
+              		success: function(json) {
+                    setTimeout(function(){
+                        price.text(json['price']);
+                     }, 300);  // The millis to wait before executing this block
+                    price.fadeIn();
+                    $("#content").find(".auto-old-price").text(json['old_price']);
+                    $("#content").find(".auto-points").text('{{ text_points }} ' + json['points']);
+                    $("#content").find(".auto-extax").text('{{ text_tax}} ' + json['extax']);
+              		},
+                  error: function(xhr, ajaxOptions, thrownError) {
+                      alert(thrownError + "\r\n" + xhr.statusText + "\r\n" + xhr.responseText);
+                  }
+              	});
+              }
+              /* first load*/
+              autoprice();
+              /*----*/
+              $('#input-quantity').on('keyup', function() {
+                autoprice();
+              });
+              $('#product select').on('click', function() {
+                autoprice();
+              });
+
+              $('#product input[type=\'radio\']').on('click', function() {
+                autoprice();
+              });
+              $('#product input[type=\'checkbox\']').on('click', function() {
+                autoprice();
+              });
+            });
+            //--></script>
+            <!------>
+            ]]>
+          </add>
+      </operation>
+      <operation error="skip">
+          <search ><![CDATA[<h2>{{ price }}</h2>]]></search>
+          <add position="replace"><![CDATA[
+            <!--PL-->
+            <h2><span class="auto-price">{{ price }}</span></h2>
+            <!------>
+            ]]>
+          </add>
+      </operation>
+      <operation error="skip">
+          <search ><![CDATA[<li><span style="text-decoration: line-through;">{{ price }}</span></li>]]></search>
+          <add position="replace"><![CDATA[
+            <!--PL-->
+            <li><span style="text-decoration: line-through;" class="auto-old-price">{{ price }}</span></li>
+            <!------>
+            ]]>
+          </add>
+      </operation>
+      <operation error="skip">
+          <search ><![CDATA[<h2>{{ special }}</h2>]]></search>
+          <add position="replace"><![CDATA[
+            <!--PL-->
+            <h2><span class="auto-price">{{ special }}</span></h2>
+            <!------>
+            ]]>
+          </add>
+      </operation>
+      <operation error="skip">
+          <search ><![CDATA[<li>{{ text_tax }} {{ tax }}</li>]]></search>
+          <add position="replace"><![CDATA[
+            <!--PL-->
+            <li><span class="auto-extax">{{ text_tax }} {{ tax }}</span></li>
+            <!------>
+            ]]>
+          </add>
+      </operation>
+      <operation error="skip">
+          <search ><![CDATA[<li>{{ text_points }} {{ points }}</li>]]></search>
+          <add position="replace"><![CDATA[
+            <!--PL-->
+            <li><span class="auto-points">{{ text_points }} {{ points }}</span></li>
+            <!------>
+            ]]>
+          </add>
+      </operation>
+    </file>
+</modification>
