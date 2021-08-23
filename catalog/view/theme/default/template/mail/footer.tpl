@@ -1,0 +1,1 @@
+  <p style="margin-top: 0px; margin-bottom: 20px;"><?php echo $text_footer; ?></p></div></body></html>
